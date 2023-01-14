@@ -1,20 +1,34 @@
 import tkinter as tk
-import time
+from time import sleep
 from datetime import datetime, timezone, timedelta
 import startTime
+import replayMovement
 
 
 offset = 0
+is_recording = False
+is_replaying = False
 
 def record():
     log_filename = filename_entry.get()
-    # Code for the record function
-    print("Recording to", log_filename)
+    global is_recording
+    if is_recording:
+        record_button.config(bg=root.cget('bg'), text="Record")
+        is_recording = False
+        print("Stopped recording")
+    else:
+        record_button.config(bg="red", text="Record")
+        is_recording = True
+        print("Recording to", log_filename)
+
 
 def replay():
     input_time = input_entry.get()
-    # Code for the replay function
+    print("Replaying in 3 seconds...")
+    sleep(3)
     print("Replaying at", input_time)
+    replayMovement.replay_log('cha_cha_slide.log')
+
 
 def update_time():
     global offset
@@ -46,11 +60,11 @@ filename_entry.grid(row=0, column=1, padx=10, pady=10)
 divider = tk.Frame(root, height=2, bd=1, relief=tk.SUNKEN)
 divider.grid(row=1, column=0, columnspan=2, pady=10, sticky="ew")
 
-input_entry = tk.Entry(root)
-input_entry.grid(row=2, column=0, padx=10, pady=10)
-
 replay_button = tk.Button(root, text="Replay", command=replay)
-replay_button.grid(row=2, column=1, padx=10, pady=10)
+replay_button.grid(row=2, column=0, padx=10, pady=10)
+
+input_entry = tk.Entry(root)
+input_entry.grid(row=2, column=1, padx=10, pady=10)
 
 clock_label = tk.Label(root, text="00:00:00", font=("Helvetica", 16))
 clock_label.grid(row=3, column=0, columnspan=2, padx=10, pady=10)
