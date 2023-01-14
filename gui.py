@@ -2,7 +2,7 @@ import tkinter as tk
 from time import sleep
 from datetime import datetime, timezone, timedelta
 import sync
-from replayRecord import record_log, replay_log
+from replayRecord import record_log, replay_at_utc
 import threading
 
 offset = 0
@@ -21,16 +21,19 @@ def record():
         record_button.config(bg="red", text="Record")
         is_recording = True
         print("Recording to", log_filename)
+        threading.Thread(target=record_log,
+                         args=((log_filename,))).start()
 
 
 def replay():
     input_time = input_entry.get()
+    log_filename = filename_entry.get()
     if input_time == "":
         print("Replaying in 3 seconds...")
     else:
         print("Replaying at", input_time)
-        threading.Thread(target=replay_log,
-                         args=(('cha_cha_slide.log')))
+        threading.Thread(target=replay_at_utc,
+                         args=((input_time, log_filename))).start()
 
 
 def update_time():
