@@ -1,13 +1,14 @@
 import tkinter as tk
 from time import sleep
 from datetime import datetime, timezone, timedelta
-import startTime
-import replayMovement
-
+import sync
+from replayRecord import record_log, replay_log
+import threading
 
 offset = 0
 is_recording = False
 is_replaying = False
+
 
 def record():
     log_filename = filename_entry.get()
@@ -24,10 +25,12 @@ def record():
 
 def replay():
     input_time = input_entry.get()
-    print("Replaying in 3 seconds...")
-    sleep(3)
-    print("Replaying at", input_time)
-    replayMovement.replay_log('cha_cha_slide.log')
+    if input_time == "":
+        print("Replaying in 3 seconds...")
+    else:
+        print("Replaying at", input_time)
+        threading.Thread(target=replay_log,
+                         args=(('cha_cha_slide.log')))
 
 
 def update_time():
@@ -37,14 +40,15 @@ def update_time():
     clock_label.config(text=current_time)
     root.after(1000, update_time)
 
+
 def update_time_offset():
-  global offset
-  utc_time = datetime.now().astimezone(timezone.utc)
-  ntp_time = startTime.getNTPTime().replace(tzinfo=timezone.utc)
-  offset_in_seconds = (ntp_time - utc_time).total_seconds()
-  offset_in_milliseconds = offset_in_seconds * 1000
-  offset = timedelta(milliseconds=offset_in_milliseconds)
-  root.after(30000, update_time_offset)
+    global offset
+    utc_time = datetime.now().astimezone(timezone.utc)
+    ntp_time = sync.getNTPTime().replace(tzinfo=timezone.utc)
+    offset_in_seconds = (ntp_time - utc_time).total_seconds()
+    offset_in_milliseconds = offset_in_seconds * 1000
+    offset = timedelta(milliseconds=offset_in_milliseconds)
+    root.after(30000, update_time_offset)
 
 
 root = tk.Tk()
