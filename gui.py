@@ -8,32 +8,45 @@ import threading
 offset = 0
 is_recording = False
 is_replaying = False
+replayThread = None
+recordThread = None
+
+
+def launch_thread_with_message(target, message, args=[], kwargs={}):
+    def target_with_msg(*args, **kwargs):
+        target(*args, **kwargs)
+        print(message)
+    thread = threading.Thread(target=target_with_msg, args=args, kwargs=kwargs)
+    thread.start()
+    return thread
 
 
 def record():
     log_filename = filename_entry.get()
-    global is_recording
+    global is_recording, recordThread
     if is_recording:
-        record_button.config(bg=root.cget('bg'), text="Record")
+        recordThread = record_button.config(bg=root.cget('bg'), text="Record")
         is_recording = False
+        recordThread.join()
         print("Stopped recording")
     else:
         record_button.config(bg="red", text="Record")
         is_recording = True
-        print("Recording to", log_filename)
-        threading.Thread(target=record_log,
-                         args=((log_filename,))).start()
+        print(f"Recording to {log_filename}")
+        launch_thread_with_message(
+            record_log, "Recording complete", args=(log_filename,))
 
 
 def replay():
+    global replayThread
     input_time = input_entry.get()
     log_filename = filename_entry.get()
     if input_time == "":
         print("Replaying in 3 seconds...")
     else:
         print("Replaying at", input_time)
-        threading.Thread(target=replay_at_utc,
-                         args=((input_time, log_filename))).start()
+        replayThread = threading.Thread(target=replay_at_utc,
+                                        args=((input_time, log_filename))).start()
 
 
 def update_time():
