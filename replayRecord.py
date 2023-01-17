@@ -54,7 +54,7 @@ def replay_log(log_filename='cha_cha_slide.log'):
             prev_timestamp = timestamp
 
 
-def replay_at_utc(input_time, log_filename='cha_cha_slide.log'):
+def replay_at_utc(input_time, log_filename='cha_cha_slide.log', offset=0):
     current_time = getNTPTime()
     print("Current time (UTC):", current_time.strftime("%H:%M:%S %Y-%m-%d"))
 
@@ -64,12 +64,15 @@ def replay_at_utc(input_time, log_filename='cha_cha_slide.log'):
                                        second=target_time.second,
                                        microsecond=0)
 
+    offset = timedelta(milliseconds=offset)
+    target_time += offset
+
     if target_time < getNTPTime():
         target_time += timedelta(days=1)
 
-    # Sleep until target time
     sleep_time = (target_time - getNTPTime()).total_seconds()
     print("Starting in:", sleep_time, "seconds")
     time.sleep(sleep_time)
     print("Started replaying at:", target_time)
     replay_log(log_filename)
+    print("done")

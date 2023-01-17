@@ -4,57 +4,82 @@ from datetime import datetime, timezone, timedelta
 import sync
 from replayRecord import record_log, replay_at_utc
 import threading
+import multiprocessing
 
 offset = 0
-is_recording = False
-is_replaying = False
 replayThread = None
 recordThread = None
-
-
-def launch_thread_with_message(target, message, args=[], kwargs={}):
-    def target_with_msg(*args, **kwargs):
-        target(*args, **kwargs)
-        print(message)
-    thread = threading.Thread(target=target_with_msg, args=args, kwargs=kwargs)
-    thread.start()
-    return thread
+isReplaying = False
+isRecording = False
 
 
 def record():
     log_filename = filename_entry.get()
-    global is_recording, recordThread
-    if is_recording:
-        recordThread = record_button.config(bg=root.cget('bg'), text="Record")
-        is_recording = False
-        recordThread.join()
-        print("Stopped recording")
-    else:
-        record_button.config(bg="red", text="Record")
-        is_recording = True
+    global recordThread, isRecording
+    if recordThread is None:
+        record_button.config(bg="red", text="Stop Recording")
         print(f"Recording to {log_filename}")
-        launch_thread_with_message(
-            record_log, "Recording complete", args=(log_filename,))
+        recordThread = multiprocessing.Process(
+            target=record_log, args=(log_filename,))
+        recordThread.start()
+        isRecording = True
+    else:
+        recordThread.terminate()
+        recordThread = None
+        record_button.config(bg=root.cget('bg'), text="Record")
+        isRecording = False
 
 
 def replay():
-    global replayThread
-    input_time = input_entry.get()
+    global replayThread, isReplaying
+    input_time = start_time_entry.get()
     log_filename = filename_entry.get()
+    user_entry_offset = offset_entry.get()
+    user_offset = 0
+    if user_entry_offset != "":
+        user_offset = int(user_entry_offset)
+
     if input_time == "":
         print("Replaying in 3 seconds...")
+        global offset
+        input_time = datetime.utcnow() + offset + timedelta(seconds=3)
+        input_time = input_time.strftime("%H:%M:%S")
     else:
-        print("Replaying at", input_time)
-        replayThread = threading.Thread(target=replay_at_utc,
-                                        args=((input_time, log_filename))).start()
+        print(f"Replaying at {input_time} with offset {user_offset}ms...")
+
+    try:
+        datetime.strptime(input_time, "%H:%M:%S")
+    except:
+        print("Invalid time format")
+        return
+
+    if replayThread is None:
+        replay_button.config(bg="red", text="Stop Replay")
+        replayThread = multiprocessing.Process(target=replay_at_utc,
+                                               args=(input_time, log_filename, user_offset))
+        replayThread.start()
+        isReplaying = True
+    else:
+        replayThread.terminate()
+        replayThread = None
+        replay_button.config(bg=root.cget('bg'), text="Replay")
+        isReplaying = False
 
 
 def update_time():
-    global offset
+    global offset, isReplaying
     current_time = datetime.utcnow() + offset
     current_time = current_time.strftime("%H:%M:%S")
+    if not start_time_entry.touched:
+        start_time_entry.fill_placeholder(current_time)
+    if start_time_entry.get() == current_time and not start_time_entry.inFocus:
+        start_time_entry.touched = False
+        start_time_entry.config(fg='grey50')
     clock_label.config(text=current_time)
-    root.after(1000, update_time)
+    root.after(100, update_time)
+    if isReplaying and not replayThread.is_alive():
+        replay_button.config(bg=root.cget('bg'), text="Replay")
+        isReplaying = False
 
 
 def update_time_offset():
@@ -67,28 +92,101 @@ def update_time_offset():
     root.after(30000, update_time_offset)
 
 
-root = tk.Tk()
-root.title("Keyboard Recorder")
+def validate_integer(P):
+    if P.strip() == "":
+        return True
+    if P.isdigit():
+        return True
+    return False
 
-record_button = tk.Button(root, text="Record", command=record)
-record_button.grid(row=0, column=0, padx=10, pady=10)
 
-filename_entry = tk.Entry(root)
-filename_entry.insert(0, "cha_cha_slide.log")
-filename_entry.grid(row=0, column=1, padx=10, pady=10)
+class PlaceholderEntry(tk.Entry):
+    touched = False
+    placeholder = ""
+    inFocus = False
 
-divider = tk.Frame(root, height=2, bd=1, relief=tk.SUNKEN)
-divider.grid(row=1, column=0, columnspan=2, pady=10, sticky="ew")
+    def __init__(self, master=None, placeholder='', cnf={}, fg='black',
+                 fg_placeholder='grey50', *args, **kw):
+        super().__init__(master=None, cnf={}, bg='white', *args, **kw)
+        self.fg = fg
+        self.fg_placeholder = fg_placeholder
+        self.placeholder = placeholder
+        self.bind('<FocusOut>', lambda event: self.fill_placeholder())
+        self.bind('<FocusIn>', lambda event: self.clear_box())
+        self.fill_placeholder()
 
-replay_button = tk.Button(root, text="Replay", command=replay)
-replay_button.grid(row=2, column=0, padx=10, pady=10)
+    def clear_box(self):
+        self.inFocus = True
+        self.config(fg=self.fg)
+        self.touched = True
 
-input_entry = tk.Entry(root)
-input_entry.grid(row=2, column=1, padx=10, pady=10)
+    def fill_placeholder(self, new_placeholder=None):
+        if super().get() == '':
+            self.touched = False
+        if new_placeholder is not None:
+            self.placeholder = new_placeholder
+            self.delete(0, 'end')
+            self.insert(0, self.placeholder)
+        else:
+            self.inFocus = False
 
-clock_label = tk.Label(root, text="00:00:00", font=("Helvetica", 16))
-clock_label.grid(row=3, column=0, columnspan=2, padx=10, pady=10)
+        if not super().get():
+            self.config(fg=self.fg_placeholder)
+            self.insert(0, self.placeholder)
+            self.inFocus = False
 
-update_time_offset()
-update_time()
-root.mainloop()
+    def get(self):
+        content = super().get()
+        if content == self.placeholder:
+            return ''
+        return content
+
+
+if __name__ == "__main__":
+    process = None
+    root = tk.Tk()
+    root.title("Keyboard Recorder")
+
+    status_label = tk.Label(root, text="Ready", font=(
+        "Helvetica", 16), justify=tk.CENTER)
+    status_label.grid(row=0, column=0, columnspan=2, padx=10, pady=10)
+
+    filename_label = tk.Label(root, text="Log file name:")
+    filename_label.grid(row=1, column=0, padx=10, pady=0)
+
+    filename_entry = tk.Entry(root)
+    filename_entry.insert(0, "cha_cha_slide.log")
+    filename_entry.grid(row=1, column=1, padx=10, pady=0)
+
+    start_time_label = tk.Label(root, text="Start time:")
+    start_time_label.grid(row=2, column=0, padx=10, pady=10)
+
+    start_time_entry = PlaceholderEntry(
+        root, datetime.utcnow().strftime("%H:%M:%S"))
+    start_time_entry.grid(row=2, column=1, padx=10, pady=10)
+
+    offset_label = tk.Label(root, text="offset (ms)")
+    offset_label.grid(row=3, column=0)
+
+    offset_entry = tk.Entry(root, validate="key", validatecommand=(
+        root.register(validate_integer), '%P'))
+    offset_entry.insert(0, "0")
+    offset_entry.grid(row=3, column=1)
+
+    divider = tk.Frame(root, height=2, bd=1, relief=tk.SUNKEN)
+    divider.grid(row=4, column=0, columnspan=2, pady=10, sticky="ew")
+
+    record_button = tk.Button(root, text="Record", command=record)
+    record_button.grid(row=5, column=0, padx=10, pady=10)
+
+    replay_button = tk.Button(root, text="Replay", command=replay)
+    replay_button.grid(row=5, column=1, padx=10, pady=10)
+
+    utc_label = tk.Label(root, text="Current UTC Time:")
+    utc_label.grid(row=6, column=0)
+    clock_label = tk.Label(root, text="00:00:00", font=("Helvetica", 16))
+    clock_label.grid(row=6, column=1)
+
+    update_time_offset()
+    update_time()
+    root.mainloop()
