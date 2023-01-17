@@ -29,18 +29,8 @@ if %version% LSS 3 (
     exit
 )
 
-REM Check if the remote repository is already set
-git remote -v | find "origin" > nul
-if %errorlevel% neq 0 (
-    REM Set the remote repository
-    git remote add origin https://github.com/El-Bad/Synchronized-Keyboard-Replay.git
-)
-
-REM Pull the latest version from GitHub
-git pull > nul
-
 REM Check if the requirements are already installed
-if not defined (requirement.txt) (
+if not exist requirements.txt (
     echo Cannot find requirements.txt
     pause
     exit
