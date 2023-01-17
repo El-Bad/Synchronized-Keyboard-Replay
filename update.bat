@@ -35,6 +35,7 @@ REM Pull the latest version from the remote repository
 git add *
 git stash
 git pull origin main
+
 if %errorlevel% neq 0 (
     echo An error occurred while pulling from the remote repository. Exiting...
     pause
