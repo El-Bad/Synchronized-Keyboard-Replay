@@ -1,19 +1,33 @@
 from pynput import keyboard
 import logging
 import time
-from sync import getNTPTime
 from datetime import datetime, timedelta
+import ntplib
+from datetime import datetime, timezone
+
+
+def getNTPTime(timezone=timezone.utc):
+    c = ntplib.NTPClient()
+    response = c.request('time.windows.com', version=3)
+    current_time = datetime.fromtimestamp(response.tx_time)
+    return current_time.astimezone(timezone)
 
 
 def record_log(log_filename='cha_cha_slide.log'):
     logging.basicConfig(filename=log_filename,
                         level=logging.DEBUG, filemode='w', format='%(message)s')
+    pressedKeys = set()
 
     def on_press(key):
         if hasattr(key, 'char'):
             current = key.char
         else:
             current = key.name
+
+        if current in pressedKeys:
+            return
+        pressedKeys.add(current)
+
         timestamp = time.perf_counter()
         logging.info(f'{timestamp} press {current}')
 
@@ -22,6 +36,11 @@ def record_log(log_filename='cha_cha_slide.log'):
             current = key.char
         else:
             current = key.name
+
+        if current not in pressedKeys:
+            return
+        pressedKeys.remove(current)
+
         timestamp = time.perf_counter()
         logging.info(f'{timestamp} release {current}')
 

@@ -1,9 +1,7 @@
 import tkinter as tk
-from time import sleep
+import time
 from datetime import datetime, timezone, timedelta
-import sync
-from replayRecord import record_log, replay_at_utc
-import threading
+from replayRecord import record_log, replay_at_utc, getNTPTime
 import multiprocessing
 
 offset = 0
@@ -24,6 +22,7 @@ def record():
         recordThread.start()
         isRecording = True
     else:
+        print("Stopping recording...")
         recordThread.terminate()
         recordThread = None
         record_button.config(bg=root.cget('bg'), text="Record")
@@ -31,7 +30,7 @@ def record():
 
 
 def replay():
-    global replayThread, isReplaying
+    global replayThread, isReplaying, offset
     input_time = start_time_entry.get()
     log_filename = filename_entry.get()
     user_entry_offset = offset_entry.get()
@@ -41,7 +40,6 @@ def replay():
 
     if input_time == "":
         print("Replaying in 3 seconds...")
-        global offset
         input_time = datetime.utcnow() + offset + timedelta(seconds=3)
         input_time = input_time.strftime("%H:%M:%S")
     else:
@@ -67,7 +65,7 @@ def replay():
 
 
 def update_time():
-    global offset, isReplaying
+    global offset, isReplaying, replayThread
     current_time = datetime.utcnow() + offset
     current_time = current_time.strftime("%H:%M:%S")
     if not start_time_entry.touched:
@@ -80,12 +78,31 @@ def update_time():
     if isReplaying and not replayThread.is_alive():
         replay_button.config(bg=root.cget('bg'), text="Replay")
         isReplaying = False
+        replayThread = None
+
+    if isRecording:
+        replay_button["state"] = "disabled"
+        filename_entry["state"] = "disabled"
+        status_label.config(text="Recording...")
+    elif isReplaying:
+        record_button["state"] = "disabled"
+        filename_entry["state"] = "disabled"
+        start_time_entry["state"] = "disabled"
+        offset_entry["state"] = "disabled"
+        status_label.config(text="Replaying...")
+    else:
+        replay_button["state"] = "normal"
+        record_button["state"] = "normal"
+        filename_entry["state"] = "normal"
+        start_time_entry["state"] = "normal"
+        offset_entry["state"] = "normal"
+        status_label.config(text="Ready")
 
 
 def update_time_offset():
     global offset
     utc_time = datetime.now().astimezone(timezone.utc)
-    ntp_time = sync.getNTPTime().replace(tzinfo=timezone.utc)
+    ntp_time = getNTPTime().replace(tzinfo=timezone.utc)
     offset_in_seconds = (ntp_time - utc_time).total_seconds()
     offset_in_milliseconds = offset_in_seconds * 1000
     offset = timedelta(milliseconds=offset_in_milliseconds)
@@ -142,9 +159,19 @@ class PlaceholderEntry(tk.Entry):
         return content
 
 
+def on_closing():
+    print("closing...")
+    if recordThread is not None:
+        recordThread.terminate()
+    if replayThread is not None:
+        replayThread.terminate()
+    root.destroy()
+
+
 if __name__ == "__main__":
     process = None
     root = tk.Tk()
+
     root.title("Keyboard Recorder")
 
     status_label = tk.Label(root, text="Ready", font=(
@@ -176,10 +203,10 @@ if __name__ == "__main__":
     divider = tk.Frame(root, height=2, bd=1, relief=tk.SUNKEN)
     divider.grid(row=4, column=0, columnspan=2, pady=10, sticky="ew")
 
-    record_button = tk.Button(root, text="Record", command=record)
+    record_button = tk.Button(root, text="Record", command=record, width=15)
     record_button.grid(row=5, column=0, padx=10, pady=10)
 
-    replay_button = tk.Button(root, text="Replay", command=replay)
+    replay_button = tk.Button(root, text="Replay", command=replay, width=15)
     replay_button.grid(row=5, column=1, padx=10, pady=10)
 
     utc_label = tk.Label(root, text="Current UTC Time:")
@@ -187,6 +214,12 @@ if __name__ == "__main__":
     clock_label = tk.Label(root, text="00:00:00", font=("Helvetica", 16))
     clock_label.grid(row=6, column=1)
 
+    starting_at_label = tk.Label(root, text="Starting replay at:")
+    starting_at_label.grid(row=7, column=0)
+    target_label = tk.Label(root, text="", font=("Helvetica", 16))
+    target_label.grid(row=7, column=1)
+
     update_time_offset()
     update_time()
+    root.protocol("WM_DELETE_WINDOW", on_closing)
     root.mainloop()
