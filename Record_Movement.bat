@@ -36,6 +36,8 @@ if not exist requirements.txt (
     exit
 )
 
+REM pip install -r requirements.txt
+
 for /f "tokens=*" %%i in (requirements.txt) do (
     pip list | find "%%i" > nul
     if %errorlevel% neq 0 (
