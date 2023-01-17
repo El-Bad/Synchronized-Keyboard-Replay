@@ -9,6 +9,7 @@ replayThread = None
 recordThread = None
 isReplaying = False
 isRecording = False
+status = "Ready"
 
 
 def record():
@@ -30,7 +31,7 @@ def record():
 
 
 def replay():
-    global replayThread, isReplaying, offset
+    global replayThread, isReplaying, offset, status
     input_time = start_time_entry.get()
     log_filename = filename_entry.get()
     user_entry_offset = offset_entry.get()
@@ -47,8 +48,10 @@ def replay():
 
     try:
         datetime.strptime(input_time, "%H:%M:%S")
+        status = "Ready"
     except:
         print("Invalid time format")
+        status = "Invalid time format"
         return
 
     if replayThread is None:
@@ -65,7 +68,7 @@ def replay():
 
 
 def update_time():
-    global offset, isReplaying, replayThread
+    global offset, isReplaying, replayThread, status
     current_time = datetime.utcnow() + offset
     current_time = current_time.strftime("%H:%M:%S")
     if not start_time_entry.touched:
@@ -96,7 +99,7 @@ def update_time():
         filename_entry["state"] = "normal"
         start_time_entry["state"] = "normal"
         offset_entry["state"] = "normal"
-        status_label.config(text="Ready")
+        status_label.config(text=status)
 
 
 def update_time_offset():
@@ -185,7 +188,7 @@ if __name__ == "__main__":
     filename_entry.insert(0, "cha_cha_slide.log")
     filename_entry.grid(row=1, column=1, padx=10, pady=0)
 
-    start_time_label = tk.Label(root, text="Start time:")
+    start_time_label = tk.Label(root, text="Start time (HH:MM:SS):")
     start_time_label.grid(row=2, column=0, padx=10, pady=10)
 
     start_time_entry = PlaceholderEntry(
