@@ -40,12 +40,25 @@ REM Pull the latest version from GitHub
 git pull > nul
 
 REM Check if the requirements are already installed
+if not defined (requirement.txt) (
+    echo Cannot find requirements.txt
+    pause
+    exit
+)
+
 for /f "tokens=*" %%i in (requirements.txt) do (
     pip list | find "%%i" > nul
     if %errorlevel% neq 0 (
         REM Install the requirement
         pip install %%i
     )
+)
+
+if %errorlevel% neq 0 (
+    echo An error occurred while running the command: %command%
+    echo Error code: %errorlevel%
+    pause
+    exit
 )
 
 REM Run the Python script
